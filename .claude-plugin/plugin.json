@@ -1,0 +1,8 @@
+{
+  "name": "agglayer-ai-skills",
+  "description": "Shared Agglayer skills for Claude Code",
+  "version": "0.1.0",
+  "author": {
+    "name": "Agglayer"
+  }
+}

@@ -34,17 +34,16 @@ OpenCode loads `.opencode/plugins/agglayer-ai-skills.js`, which appends this pac
 
 ## Claude Code installation
 
-Install `agglayer-ai-skills` through the Claude Code marketplace.
+`agglayer-ai-skills` includes the Claude plugin manifest at `.claude-plugin/plugin.json` and is structured for Claude Code marketplace distribution.
 This package is intended to be consumed globally in Claude Code rather than copied into each downstream repository.
-This design assumes marketplace installation is available.
-If that assumption proves false, revise the design instead of adding a repo-local fallback.
+If marketplace distribution is not available in the needed environment, revise the design instead of adding a repo-local fallback.
 
 ## Updating shared skills
 
 1. Edit or replace the skill files in `skills/`.
 2. Run `npm test`.
 3. Bump the version in `package.json`.
-4. Publish the updated package through the distribution channels used by OpenCode and Claude Code.
+4. Publish the updated package for OpenCode and keep the Claude plugin manifest ready for marketplace distribution.
 
 ## Scope notes
 

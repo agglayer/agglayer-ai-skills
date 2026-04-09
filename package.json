@@ -4,7 +4,8 @@
   "type": "module",
   "main": ".opencode/plugins/agglayer-ai-skills.js",
   "files": [
-    ".opencode/",
+    ".claude-plugin/",
+    ".opencode/plugins/",
     "skills/",
     "README.md"
   ],
