@@ -37,10 +37,15 @@ The OpenCode integration remains a tiny plugin file.
 
 The `skills/` directory is the source of truth for shared skill content
 within this repository.
-Those skills are copied verbatim from
+The skill set starts from files copied from
 `/Users/spaitrault/work/polygon/agglayer/.agents/skills/`, including
 nested files such as `workflow-commit/examples/samples.md`.
-No content changes are introduced during this task.
+The package also bundles a PR template artifact at
+`skills/workflow-create-pr/pull_request_template.md`, copied verbatim
+from `/Users/spaitrault/work/polygon/agglayer/.github/pull_request_template.md`.
+`workflow-create-pr/SKILL.md` may add package-specific wording to point
+at that bundled artifact as a fallback when a target repo does not ship
+its own dedicated PR template.
 
 `README.md` documents global installation and update workflows rather
 than repo-local setup.
@@ -93,6 +98,10 @@ Each copied `SKILL.md` must preserve its original frontmatter exactly.
 Verification for copied skill content is structural rather than
 transformative: the files must exist, frontmatter delimiters must remain
 present, and the expected metadata must still be readable.
+`workflow-create-pr/pull_request_template.md` must be present as a
+bundled artifact, and `workflow-create-pr/SKILL.md` should instruct the
+agent to prefer a repo-specific PR template when one exists, otherwise
+fall back to the bundled template artifact.
 
 ## Documentation Requirements
 
@@ -103,6 +112,7 @@ present, and the expected metadata must still be readable.
 - OpenCode global plugin installation
 - Claude Code marketplace installation
 - how the package is updated when shared skills change
+- the bundled `workflow-create-pr` PR template artifact and fallback rule
 - the fact that Cursor and downstream repo copying are out of scope in
   this revision
 
@@ -113,6 +123,8 @@ Verification should focus on package structure and integration readiness:
 - required files exist
 - the OpenCode plugin exports the config hook
 - the six copied skills are present under `skills/`
+- the bundled `workflow-create-pr/pull_request_template.md` artifact is
+  present
 - copied `SKILL.md` files preserve their frontmatter
 - documentation matches the revised global-only distribution model
 

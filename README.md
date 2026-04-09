@@ -12,6 +12,11 @@ This package is the source of truth for the team's globally distributed skill se
 - `meta-session-retro`
 - `docs-knowledge-base`
 
+`workflow-create-pr` also bundles
+`skills/workflow-create-pr/pull_request_template.md`.
+Use a target repo's dedicated PR template when one exists.
+Otherwise, fall back to the bundled template artifact.
+
 ## OpenCode installation
 
 Install the package globally through OpenCode's plugin configuration.

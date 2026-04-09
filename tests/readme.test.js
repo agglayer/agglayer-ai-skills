@@ -12,6 +12,12 @@ const opencodePluginPath = path.join(
   'plugins',
   'agglayer-ai-skills.js',
 );
+const workflowCreatePrTemplatePath = path.join(
+  repoRoot,
+  'skills',
+  'workflow-create-pr',
+  'pull_request_template.md',
+);
 const bundledSkillDirs = [
   'workflow-commit',
   'workflow-verify',
@@ -23,6 +29,7 @@ const bundledSkillDirs = [
 
 test('README documents the global installation model', () => {
   const content = readFileSync(readmePath, 'utf8');
+  const normalizedContent = content.replace(/\s+/g, ' ').trim();
 
   assert.match(content, /^# agglayer-ai-skills/m);
   assert.match(content, /workflow-commit/);
@@ -31,6 +38,10 @@ test('README documents the global installation model', () => {
   assert.match(content, /style-prose/);
   assert.match(content, /meta-session-retro/);
   assert.match(content, /docs-knowledge-base/);
+  assert.match(
+    normalizedContent,
+    /`workflow-create-pr` also bundles `skills\/workflow-create-pr\/pull_request_template\.md`\. Use a target repo's dedicated PR template when one exists\. Otherwise, fall back to the bundled template artifact\./i,
+  );
   assert.match(content, /OpenCode/);
   assert.match(content, /\.opencode\/opencode\.json/);
   assert.match(content, /Claude Code/);
@@ -42,6 +53,7 @@ test('README documents the global installation model', () => {
   assert.match(content, /no CLI/i);
 
   assert.equal(statSync(opencodePluginPath).isFile(), true);
+  assert.equal(statSync(workflowCreatePrTemplatePath).isFile(), true);
 
   for (const bundledSkillDir of bundledSkillDirs) {
     assert.equal(statSync(bundledSkillDir).isDirectory(), true);
