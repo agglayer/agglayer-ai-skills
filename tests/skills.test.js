@@ -33,7 +33,7 @@ const skillFiles = [
 const expectedDigests = {
   'workflow-commit/SKILL.md': 'de457f3e0d9d60bc4e9ee7061d8e87150020a1e492d955a05cfafac0ef5194fb',
   'workflow-commit/examples/samples.md': 'cc42b5cbeece7ea117b562af670964a4d40aadac0f7b10ceacd2c1a76a83250c',
-  'workflow-verify/SKILL.md': '1ae657351ab8d38c16611c7b9e87c5f7688f1954757303d2be2e89578d884115',
+  'workflow-verify/SKILL.md': '3b50eb730f1f5cb9001dc7cb0d34a6b1b8cae16271b812c666a60e00b578a74a',
   'style-prose/SKILL.md': '6bc2a977f52e28967340505d6acd38ad85753f3201235a4d69cb2f5fa9da7019',
   'meta-session-retro/SKILL.md': '287cc834d4794305e24aee10e47c88b1f4e2af5ce5a7a94afd0e576bd60f88dc',
   'docs-knowledge-base/SKILL.md': '3ac97b891d879d9cf5640f3c6bb90685148553f3dae4e9789af250937d85d1d9',
