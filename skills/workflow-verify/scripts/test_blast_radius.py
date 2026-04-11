@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import pytest
 
-from blast_radius import is_prose_or_docs, split_nonempty_lines, crate_name, parse_analysis
+from unittest.mock import patch
+
+from blast_radius import is_prose_or_docs, split_nonempty_lines, crate_name, parse_analysis, match_pattern, load_config, DEFAULT_CONFIG
 
 
 class TestIsProseOrDocs:
@@ -108,3 +110,71 @@ class TestParseAnalysisOutputShape:
         assert result["docs_only"] is False
         assert "agglayer-types" in result["affected_crates"]
         assert "code" in result["recommended_scopes"]
+
+
+class TestMatchPattern:
+    def test_exact_match(self):
+        assert match_pattern("buf.yaml", "buf.yaml") is True
+
+    def test_prefix_match_directory(self):
+        assert match_pattern("proto/types.proto", "proto/") is True
+
+    def test_prefix_no_match(self):
+        assert match_pattern("src/proto/types.proto", "proto/") is False
+
+    def test_glob_suffix(self):
+        assert match_pattern(
+            "crates/pessimistic-proof/src/lib.rs", "crates/pessimistic-proof"
+        ) is True
+
+    def test_glob_suffix_related_crate(self):
+        assert match_pattern(
+            "crates/pessimistic-proof-test-suite/tests/foo.rs",
+            "crates/pessimistic-proof",
+        ) is True
+
+    def test_no_match(self):
+        assert match_pattern("crates/agglayer-types/lib.rs", "proto/") is False
+
+    def test_empty_pattern(self):
+        assert match_pattern("anything", "") is True
+
+    def test_empty_path(self):
+        assert match_pattern("", "proto/") is False
+
+
+class TestLoadConfig:
+    def test_returns_default_when_no_file(self, tmp_path):
+        with patch("blast_radius.run_git", return_value=str(tmp_path)):
+            config = load_config()
+        assert config == DEFAULT_CONFIG
+
+    def test_loads_yaml_config(self, tmp_path):
+        config_content = (
+            "core_crates:\n"
+            "  - my-crate\n"
+            "risk_areas: []\n"
+            "docs_commands: []\n"
+            "code_commands: []\n"
+        )
+        (tmp_path / ".blast-radius.yaml").write_text(config_content)
+        with patch("blast_radius.run_git", return_value=str(tmp_path)):
+            config = load_config()
+        assert config["core_crates"] == ["my-crate"]
+        assert config["risk_areas"] == []
+
+    def test_missing_keys_get_defaults(self, tmp_path):
+        config_content = "core_crates:\n  - foo\n"
+        (tmp_path / ".blast-radius.yaml").write_text(config_content)
+        with patch("blast_radius.run_git", return_value=str(tmp_path)):
+            config = load_config()
+        assert config["core_crates"] == ["foo"]
+        assert config["risk_areas"] == []
+        assert config["docs_commands"] == []
+        assert config["code_commands"] == []
+
+    def test_empty_yaml_returns_defaults(self, tmp_path):
+        (tmp_path / ".blast-radius.yaml").write_text("")
+        with patch("blast_radius.run_git", return_value=str(tmp_path)):
+            config = load_config()
+        assert config == DEFAULT_CONFIG
