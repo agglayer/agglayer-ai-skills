@@ -1,0 +1,57 @@
+# Agglayer blast-radius configuration.
+# See: docs/superpowers/specs/2026-04-11-generic-blast-radius-design.md
+
+core_crates:
+  - agglayer-types
+  - agglayer-storage
+  - agglayer-config
+  - agglayer-rpc
+  - agglayer-jsonrpc-api
+  - agglayer-grpc-api
+  - agglayer-grpc-types
+  - agglayer-node
+
+risk_areas:
+  - name: proof pipeline changes
+    patterns:
+      - "crates/pessimistic-proof"
+    scope: proof
+    commands:
+      - "cargo make pp-check-vkey-change"
+
+  - name: protobuf schema changes
+    patterns:
+      - "proto/"
+      - "buf.yaml"
+      - "buf.rust.gen.yaml"
+      - "buf.storage.gen.yaml"
+    scope: proto
+    propagates_to:
+      - agglayer-grpc-api
+      - agglayer-grpc-client
+      - agglayer-grpc-server
+      - agglayer-grpc-types
+      - agglayer-storage
+    commands:
+      - "cargo make generate-proto"
+
+  - name: storage schema/migration changes
+    patterns:
+      - "crates/agglayer-storage/"
+      - "proto/agglayer/storage/"
+
+  - name: settlement/signer/contract changes
+    patterns:
+      - "crates/agglayer-settlement-service/"
+      - "crates/agglayer-signer/"
+      - "crates/agglayer-contracts/"
+
+  - name: configuration schema changes
+    patterns:
+      - "crates/agglayer-config/"
+
+docs_commands:
+  - "mdbook build docs/knowledge-base/"
+
+code_commands:
+  - "cargo make ci-all"
