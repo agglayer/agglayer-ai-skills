@@ -24,28 +24,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "code_commands": [],
 }
 
-PROTO_CONFIG_FILES = {
-    "buf.yaml",
-    "buf.rust.gen.yaml",
-    "buf.storage.gen.yaml",
-}
 RUNTIME_MARKER_FILES = {
     "Cargo.toml",
     "Cargo.lock",
     "Makefile.toml",
     "rust-toolchain",
     "rust-toolchain.toml",
-    *PROTO_CONFIG_FILES,
-}
-CORE_BROAD_CRATES = {
-    "agglayer-types",
-    "agglayer-storage",
-    "agglayer-config",
-    "agglayer-rpc",
-    "agglayer-jsonrpc-api",
-    "agglayer-grpc-api",
-    "agglayer-grpc-types",
-    "agglayer-node",
 }
 
 
@@ -203,20 +187,31 @@ def match_pattern(path: str, pattern: str) -> bool:
     return path.startswith(prefix)
 
 
-def parse_analysis(changed_files: list[str], analysis_source: str) -> dict[str, Any]:
+def parse_analysis(
+    changed_files: list[str],
+    analysis_source: str,
+    config: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    if config is None:
+        config = DEFAULT_CONFIG
+
+    core_crates: set[str] = set(config.get("core_crates", []))
+    risk_areas: list[dict[str, Any]] = config.get("risk_areas", [])
+    docs_commands: list[str] = config.get("docs_commands", [])
+    code_commands: list[str] = config.get("code_commands", [])
+
+    # Discover affected crates from crates/ paths.
     crates = unique(
         [name for path in changed_files if (name := crate_name(path)) is not None]
     )
-    knowledge_base_changed = any(path.startswith("docs/knowledge-base/") for path in changed_files)
-    proto_changed = any(
-        path.startswith("proto/") or Path(path).name in PROTO_CONFIG_FILES
-        for path in changed_files
-    )
-    proof_changed = any(
-        path.startswith("crates/pessimistic-proof") for path in changed_files
+
+    knowledge_base_changed = any(
+        path.startswith("docs/knowledge-base/") for path in changed_files
     )
 
-    docs_only = bool(changed_files) and all(is_prose_or_docs(path) for path in changed_files)
+    docs_only = bool(changed_files) and all(
+        is_prose_or_docs(path) for path in changed_files
+    )
     runtime_behavior_may_change = any(
         path.startswith("crates/")
         or path.startswith("proto/")
@@ -225,83 +220,96 @@ def parse_analysis(changed_files: list[str], analysis_source: str) -> dict[str, 
         for path in changed_files
     )
 
-    affected_crates = set(crates)
-    if proto_changed:
-        affected_crates.update(
-            {
-                "agglayer-grpc-api",
-                "agglayer-grpc-client",
-                "agglayer-grpc-server",
-                "agglayer-grpc-types",
-                "agglayer-storage",
-            }
-        )
-
+    # Match risk areas from config.
+    affected_modules: set[str] = set(crates)
     risk_flags: list[str] = []
-    if proof_changed:
-        risk_flags.append("proof pipeline changes")
-    if proto_changed:
-        risk_flags.append("protobuf schema changes")
-    if any(
-        path.startswith("crates/agglayer-storage/") or path.startswith("proto/agglayer/storage/")
-        for path in changed_files
-    ):
-        risk_flags.append("storage schema/migration changes")
-    if any(
-        path.startswith("crates/agglayer-settlement-service/")
-        or path.startswith("crates/agglayer-signer/")
-        or path.startswith("crates/agglayer-contracts/")
-        for path in changed_files
-    ):
-        risk_flags.append("settlement/signer/contract changes")
-    if any(path.startswith("crates/agglayer-config/") for path in changed_files):
-        risk_flags.append("configuration schema changes")
+    triggered_scopes: set[str] = set()
+    scope_commands: dict[str, list[str]] = {}
 
+    for area in risk_areas:
+        area_name: str = area["name"]
+        patterns: list[str] = area.get("patterns", [])
+        matched = any(
+            match_pattern(path, pattern)
+            for path in changed_files
+            for pattern in patterns
+        )
+        if not matched:
+            continue
+
+        risk_flags.append(area_name)
+
+        if "propagates_to" in area:
+            affected_modules.update(area["propagates_to"])
+
+        if "scope" in area:
+            scope = area["scope"]
+            triggered_scopes.add(scope)
+            if "commands" in area:
+                scope_commands.setdefault(scope, []).extend(area["commands"])
+
+    # Build recommended scopes.
     recommended_scopes = ["minimal"]
     if runtime_behavior_may_change and not docs_only:
         recommended_scopes.append("code")
-    if proof_changed:
-        recommended_scopes.append("proof")
-    if proto_changed:
-        recommended_scopes.append("proto")
+    for scope in sorted(triggered_scopes):
+        if scope not in recommended_scopes:
+            recommended_scopes.append(scope)
 
+    # Broad impact detection.
     broad_impact = bool(
-        proto_changed
-        or len(affected_crates) >= 4
-        or any(crate in CORE_BROAD_CRATES for crate in affected_crates)
+        len(affected_modules) >= 4
+        or any(crate in core_crates for crate in affected_modules)
+        or any(scope in triggered_scopes for scope in ("proto",))
     )
 
-    recommended_commands = []
-    if "proto" in recommended_scopes:
-        recommended_commands.append("cargo make generate-proto")
+    # Build recommended commands.
+    recommended_commands: list[str] = []
 
+    # Scope-triggered commands that should run first (e.g. proto generation).
+    for scope in sorted(triggered_scopes):
+        for cmd in scope_commands.get(scope, []):
+            if cmd not in recommended_commands:
+                recommended_commands.append(cmd)
+
+    # Minimal: always cargo check.
     recommended_commands.append("cargo check --workspace --tests --all-features")
-    if docs_only or knowledge_base_changed:
-        recommended_commands.append("mdbook build docs/knowledge-base/")
 
+    # Docs commands.
+    if docs_only or knowledge_base_changed:
+        for cmd in docs_commands:
+            if cmd not in recommended_commands:
+                recommended_commands.append(cmd)
+
+    # Code scope.
     if "code" in recommended_scopes:
-        recommended_commands.append("cargo make ci-all")
-        targeted_crates = sorted(affected_crates)
-        if broad_impact or not targeted_crates:
+        for cmd in code_commands:
+            if cmd not in recommended_commands:
+                recommended_commands.append(cmd)
+        targeted_modules = sorted(affected_modules)
+        if broad_impact or not targeted_modules:
             recommended_commands.append("cargo nextest run --workspace")
         else:
-            package_args = " ".join(f"-p {crate}" for crate in targeted_crates)
+            package_args = " ".join(f"-p {m}" for m in targeted_modules)
             recommended_commands.append(f"cargo nextest run {package_args}")
-
-    if "proof" in recommended_scopes:
-        recommended_commands.append("cargo make pp-check-vkey-change")
 
     return {
         "analysis_source": analysis_source,
         "changed_files": changed_files,
         "changed_file_count": len(changed_files),
         "affected_areas": {
-            "proto": proto_changed,
-            "proof": proof_changed,
+            "proto": any(
+                s == "proto" for s in triggered_scopes
+            ),
+            "proof": any(
+                s == "proof" for s in triggered_scopes
+            ),
             "crates": crates,
-            "docs_or_prose": [path for path in changed_files if is_prose_or_docs(path)],
+            "docs_or_prose": [
+                path for path in changed_files if is_prose_or_docs(path)
+            ],
         },
-        "affected_crates": sorted(affected_crates),
+        "affected_modules": sorted(affected_modules),
         "risk_flags": risk_flags,
         "docs_only": docs_only,
         "recommended_scopes": recommended_scopes,
@@ -314,7 +322,7 @@ def print_text(analysis: dict[str, Any]) -> None:
     print(f"analysis_source: {analysis['analysis_source']}")
     print(f"changed_file_count: {analysis['changed_file_count']}")
     print(f"docs_only: {analysis['docs_only']}")
-    print(f"affected_crates: {', '.join(analysis['affected_crates']) or 'none'}")
+    print(f"affected_modules: {', '.join(analysis['affected_modules']) or 'none'}")
     print(f"risk_flags: {', '.join(analysis['risk_flags']) or 'none'}")
     print(f"recommended_scopes: {', '.join(analysis['recommended_scopes'])}")
     print("recommended_commands:")
@@ -338,8 +346,9 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     try:
+        config = load_config()
         changed_files, analysis_source = list_changed_files()
-        analysis = parse_analysis(changed_files, analysis_source)
+        analysis = parse_analysis(changed_files, analysis_source, config)
     except RuntimeError as error:
         print(str(error), file=sys.stderr)
         return 1

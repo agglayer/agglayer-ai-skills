@@ -87,28 +87,32 @@ class TestParseAnalysisOutputShape:
     """Verify the output dict has all expected keys."""
 
     def test_empty_input(self):
-        result = parse_analysis([], "none")
+        result = parse_analysis([], "none", DEFAULT_CONFIG)
         assert result["analysis_source"] == "none"
         assert result["changed_files"] == []
         assert result["changed_file_count"] == 0
         assert result["docs_only"] is False
         assert result["broad_impact"] is False
-        assert "affected_crates" in result
+        assert "affected_modules" in result
         assert "risk_flags" in result
         assert "recommended_scopes" in result
         assert "recommended_commands" in result
 
     def test_docs_only(self):
-        result = parse_analysis(["docs/foo.md", "README.md"], "working-tree")
+        result = parse_analysis(
+            ["docs/foo.md", "README.md"], "working-tree", DEFAULT_CONFIG
+        )
         assert result["docs_only"] is True
         assert "minimal" in result["recommended_scopes"]
 
     def test_crate_change(self):
+        config = dict(DEFAULT_CONFIG)
+        config["core_crates"] = ["agglayer-types"]
         result = parse_analysis(
-            ["crates/agglayer-types/src/lib.rs"], "main...HEAD"
+            ["crates/agglayer-types/src/lib.rs"], "main...HEAD", config
         )
         assert result["docs_only"] is False
-        assert "agglayer-types" in result["affected_crates"]
+        assert "agglayer-types" in result["affected_modules"]
         assert "code" in result["recommended_scopes"]
 
 
@@ -178,3 +182,170 @@ class TestLoadConfig:
         with patch("blast_radius.run_git", return_value=str(tmp_path)):
             config = load_config()
         assert config == DEFAULT_CONFIG
+
+
+AGGLAYER_CONFIG: dict = {
+    "core_crates": [
+        "agglayer-types",
+        "agglayer-storage",
+        "agglayer-config",
+        "agglayer-rpc",
+        "agglayer-jsonrpc-api",
+        "agglayer-grpc-api",
+        "agglayer-grpc-types",
+        "agglayer-node",
+    ],
+    "risk_areas": [
+        {
+            "name": "proof pipeline changes",
+            "patterns": ["crates/pessimistic-proof"],
+            "scope": "proof",
+            "commands": ["cargo make pp-check-vkey-change"],
+        },
+        {
+            "name": "protobuf schema changes",
+            "patterns": ["proto/", "buf.yaml", "buf.rust.gen.yaml", "buf.storage.gen.yaml"],
+            "scope": "proto",
+            "propagates_to": [
+                "agglayer-grpc-api",
+                "agglayer-grpc-client",
+                "agglayer-grpc-server",
+                "agglayer-grpc-types",
+                "agglayer-storage",
+            ],
+            "commands": ["cargo make generate-proto"],
+        },
+        {
+            "name": "storage schema/migration changes",
+            "patterns": ["crates/agglayer-storage/", "proto/agglayer/storage/"],
+        },
+        {
+            "name": "settlement/signer/contract changes",
+            "patterns": [
+                "crates/agglayer-settlement-service/",
+                "crates/agglayer-signer/",
+                "crates/agglayer-contracts/",
+            ],
+        },
+        {
+            "name": "configuration schema changes",
+            "patterns": ["crates/agglayer-config/"],
+        },
+    ],
+    "docs_commands": ["mdbook build docs/knowledge-base/"],
+    "code_commands": ["cargo make ci-all"],
+}
+
+
+class TestParseAnalysisConfigDriven:
+    """Test parse_analysis with explicit config (new signature)."""
+
+    def test_empty_with_default_config(self):
+        result = parse_analysis([], "none", DEFAULT_CONFIG)
+        assert result["changed_file_count"] == 0
+        assert result["docs_only"] is False
+        assert result["risk_flags"] == []
+        assert result["recommended_scopes"] == ["minimal"]
+        assert result["broad_impact"] is False
+
+    def test_docs_only_with_config(self):
+        result = parse_analysis(
+            ["docs/foo.md", "README.md"], "working-tree", AGGLAYER_CONFIG
+        )
+        assert result["docs_only"] is True
+        assert "mdbook build docs/knowledge-base/" in result["recommended_commands"]
+
+    def test_proof_risk_flagged(self):
+        result = parse_analysis(
+            ["crates/pessimistic-proof/src/lib.rs"], "main...HEAD", AGGLAYER_CONFIG
+        )
+        assert "proof pipeline changes" in result["risk_flags"]
+        assert "proof" in result["recommended_scopes"]
+        assert "cargo make pp-check-vkey-change" in result["recommended_commands"]
+
+    def test_proto_risk_with_propagation(self):
+        result = parse_analysis(
+            ["proto/agglayer/types.proto"], "main...HEAD", AGGLAYER_CONFIG
+        )
+        assert "protobuf schema changes" in result["risk_flags"]
+        assert "proto" in result["recommended_scopes"]
+        assert "agglayer-grpc-api" in result["affected_modules"]
+        assert "agglayer-storage" in result["affected_modules"]
+        assert "cargo make generate-proto" in result["recommended_commands"]
+
+    def test_core_crate_triggers_broad_impact(self):
+        result = parse_analysis(
+            ["crates/agglayer-types/src/lib.rs"], "main...HEAD", AGGLAYER_CONFIG
+        )
+        assert result["broad_impact"] is True
+
+    def test_non_core_crate_no_broad_impact(self):
+        result = parse_analysis(
+            ["crates/agglayer-prover/src/lib.rs"], "main...HEAD", AGGLAYER_CONFIG
+        )
+        assert result["broad_impact"] is False
+
+    def test_many_crates_trigger_broad_impact(self):
+        files = [
+            "crates/a/src/lib.rs",
+            "crates/b/src/lib.rs",
+            "crates/c/src/lib.rs",
+            "crates/d/src/lib.rs",
+        ]
+        result = parse_analysis(files, "main...HEAD", AGGLAYER_CONFIG)
+        assert result["broad_impact"] is True
+
+    def test_storage_risk_flagged(self):
+        result = parse_analysis(
+            ["crates/agglayer-storage/migrations/001.sql"], "main...HEAD", AGGLAYER_CONFIG
+        )
+        assert "storage schema/migration changes" in result["risk_flags"]
+
+    def test_settlement_risk_flagged(self):
+        result = parse_analysis(
+            ["crates/agglayer-signer/src/lib.rs"], "main...HEAD", AGGLAYER_CONFIG
+        )
+        assert "settlement/signer/contract changes" in result["risk_flags"]
+
+    def test_config_risk_flagged(self):
+        result = parse_analysis(
+            ["crates/agglayer-config/src/lib.rs"], "main...HEAD", AGGLAYER_CONFIG
+        )
+        assert "configuration schema changes" in result["risk_flags"]
+
+    def test_code_commands_included(self):
+        result = parse_analysis(
+            ["crates/agglayer-types/src/lib.rs"], "main...HEAD", AGGLAYER_CONFIG
+        )
+        assert "cargo make ci-all" in result["recommended_commands"]
+
+    def test_no_config_still_detects_crates(self):
+        result = parse_analysis(
+            ["crates/my-crate/src/lib.rs"], "main...HEAD", DEFAULT_CONFIG
+        )
+        assert "my-crate" in result["affected_modules"]
+        assert "code" in result["recommended_scopes"]
+
+    def test_knowledge_base_triggers_docs_commands(self):
+        result = parse_analysis(
+            ["docs/knowledge-base/src/chapter.md", "crates/foo/src/lib.rs"],
+            "main...HEAD",
+            AGGLAYER_CONFIG,
+        )
+        assert "mdbook build docs/knowledge-base/" in result["recommended_commands"]
+
+    def test_workspace_nextest_on_broad_impact(self):
+        result = parse_analysis(
+            ["crates/agglayer-types/src/lib.rs"], "main...HEAD", AGGLAYER_CONFIG
+        )
+        assert "cargo nextest run --workspace" in result["recommended_commands"]
+
+    def test_targeted_nextest_on_narrow_change(self):
+        result = parse_analysis(
+            ["crates/agglayer-prover/src/lib.rs"], "main...HEAD", AGGLAYER_CONFIG
+        )
+        targeted = [
+            c for c in result["recommended_commands"] if "nextest" in c
+        ]
+        assert len(targeted) == 1
+        assert "-p agglayer-prover" in targeted[0]
