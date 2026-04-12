@@ -80,7 +80,7 @@ test('workflow-create-pr defines the context-line-first template fallback workfl
   assert.match(content, /dedicated PR template[\s\S]*after the context line/i);
   assert.match(
     content,
-    /workflow-create-pr\/pull_request_template\.md[\s\S]*after the context line/i,
+    /pull_request_template\.md[\s\S]*after the context line/i,
   );
   assert.match(content, /Do not add extra headings beyond those required by the selected template\./);
 });

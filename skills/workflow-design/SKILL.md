@@ -1,13 +1,13 @@
 ---
 name: design
 description: >
-  Recommend superpowers brainstorming and writing-plans skills
-  for design work, with specs and plans in docs/knowledge-base.
-user-invocable: false
+  You MUST use this before any creative work - creating features,
+  building components, adding functionality, or modifying behavior.
+  Explores user intent, requirements and design before implementation.
+  Writes specs and plans to docs/knowledge-base/src/ai-agents/.
 ---
 
-When designing a feature or planning implementation work,
-use the superpowers `brainstorming` skill to explore intent
+Use the superpowers `brainstorming` skill to explore intent
 and produce a spec,
 then use the `writing-plans` skill to turn the spec
 into an implementation plan.
