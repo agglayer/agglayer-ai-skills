@@ -25,6 +25,7 @@ const skillFiles = [
   'workflow-commit/SKILL.md',
   'workflow-verify/SKILL.md',
   'workflow-create-pr/SKILL.md',
+  'workflow-design/SKILL.md',
   'style-prose/SKILL.md',
   'meta-session-retro/SKILL.md',
   'docs-knowledge-base/SKILL.md',
