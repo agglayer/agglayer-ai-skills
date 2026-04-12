@@ -1,16 +1,22 @@
 ---
 name: design
 description: >
-  You MUST use this before any creative work - creating features,
-  building components, adding functionality, or modifying behavior.
-  Explores user intent, requirements and design before implementation.
-  Writes specs and plans to docs/knowledge-base/src/ai-agents/.
+  Required alongside brainstorming for all design work in this
+  repository. Overrides spec and plan output paths to
+  docs/knowledge-base/src/ai-agents/ instead of the superpowers
+  defaults. Load this skill whenever you load brainstorming.
 ---
 
-Use the superpowers `brainstorming` skill to explore intent
-and produce a spec,
-then use the `writing-plans` skill to turn the spec
-into an implementation plan.
+This skill provides project-local overrides
+for the superpowers `brainstorming` and `writing-plans` skills.
+Load it **alongside** brainstorming, not instead of it.
+
+## What this skill changes
+
+The only thing this skill does is redirect output paths.
+Without it, specs and plans land in `docs/superpowers/`
+(the superpowers default), which is the wrong location
+for this repository.
 
 ## Output location
 
