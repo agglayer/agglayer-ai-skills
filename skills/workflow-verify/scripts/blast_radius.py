@@ -59,13 +59,44 @@ def split_nonempty_lines(value: str) -> list[str]:
     return [line for line in value.splitlines() if line]
 
 
+def _find_config_path() -> Path | None:
+    """Locate ``.blast-radius.yaml`` in the repo root.
+
+    Returns the resolved :class:`Path` when the file exists,
+    *None* when it is absent or the repo root cannot be determined.
+    This helper deliberately avoids importing PyYAML so callers
+    can decide whether a missing parser is fatal.
+    """
+    try:
+        repo_root = run_git(["rev-parse", "--show-toplevel"])
+    except RuntimeError:
+        return None
+
+    config_path = Path(repo_root) / ".blast-radius.yaml"
+    if config_path.exists():
+        return config_path
+    return None
+
+
 def load_config() -> dict[str, Any]:
     """Load ``.blast-radius.yaml`` from the repo root.
 
-    Returns *DEFAULT_CONFIG* when the file is absent,
-    unreadable, or PyYAML is not installed.
+    Returns *DEFAULT_CONFIG* when no config file exists.
+
+    Raises :class:`RuntimeError` when:
+    - A config file exists but PyYAML is not installed.
+    - The config file fails to parse.
+    - The parsed YAML is not a mapping (dict).
     """
+    config_path = _find_config_path()
+
     if yaml is None:
+        if config_path is not None:
+            raise RuntimeError(
+                f"PyYAML is not installed but {config_path} exists. "
+                "Install PyYAML (`pip install pyyaml`) so the config "
+                "file is honoured, or remove the file to use defaults."
+            )
         print(
             "warning: PyYAML not installed; "
             "install with `pip install pyyaml` for config support. "
@@ -74,23 +105,26 @@ def load_config() -> dict[str, Any]:
         )
         return dict(DEFAULT_CONFIG)
 
-    try:
-        repo_root = run_git(["rev-parse", "--show-toplevel"])
-    except RuntimeError:
-        return dict(DEFAULT_CONFIG)
-
-    config_path = Path(repo_root) / ".blast-radius.yaml"
-    if not config_path.exists():
+    if config_path is None:
         return dict(DEFAULT_CONFIG)
 
     try:
         with open(config_path) as fh:
             raw = yaml.safe_load(fh)
-    except Exception:
+    except Exception as exc:
+        raise RuntimeError(
+            f"failed to parse {config_path}: {exc}"
+        ) from exc
+
+    if raw is None:
+        # Empty YAML document (e.g. blank file).
         return dict(DEFAULT_CONFIG)
 
     if not isinstance(raw, dict):
-        return dict(DEFAULT_CONFIG)
+        raise RuntimeError(
+            f"expected a YAML mapping in {config_path}, "
+            f"got {type(raw).__name__}"
+        )
 
     return {
         "core_crates": raw.get("core_crates", []) or [],

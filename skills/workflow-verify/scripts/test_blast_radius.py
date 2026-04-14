@@ -7,7 +7,7 @@ import pytest
 
 from unittest.mock import patch
 
-from blast_radius import is_prose_or_docs, split_nonempty_lines, crate_name, parse_analysis, match_pattern, load_config, DEFAULT_CONFIG
+from blast_radius import is_prose_or_docs, split_nonempty_lines, crate_name, parse_analysis, match_pattern, load_config, _find_config_path, DEFAULT_CONFIG
 
 
 class TestIsProseOrDocs:
@@ -147,6 +147,26 @@ class TestMatchPattern:
         assert match_pattern("", "proto/") is False
 
 
+class TestFindConfigPath:
+    """Tests for _find_config_path() helper."""
+
+    def test_returns_path_when_config_exists(self, tmp_path):
+        (tmp_path / ".blast-radius.yaml").write_text("core_crates: []\n")
+        with patch("blast_radius.run_git", return_value=str(tmp_path)):
+            result = _find_config_path()
+        assert result == tmp_path / ".blast-radius.yaml"
+
+    def test_returns_none_when_no_config(self, tmp_path):
+        with patch("blast_radius.run_git", return_value=str(tmp_path)):
+            result = _find_config_path()
+        assert result is None
+
+    def test_returns_none_when_git_fails(self):
+        with patch("blast_radius.run_git", side_effect=RuntimeError("not a repo")):
+            result = _find_config_path()
+        assert result is None
+
+
 class TestLoadConfig:
     def test_returns_default_when_no_file(self, tmp_path):
         with patch("blast_radius.run_git", return_value=str(tmp_path)):
@@ -182,6 +202,41 @@ class TestLoadConfig:
         with patch("blast_radius.run_git", return_value=str(tmp_path)):
             config = load_config()
         assert config == DEFAULT_CONFIG
+
+    def test_config_exists_no_pyyaml_raises(self, tmp_path):
+        """When .blast-radius.yaml exists but PyYAML is missing, raise RuntimeError."""
+        (tmp_path / ".blast-radius.yaml").write_text("core_crates:\n  - foo\n")
+        with (
+            patch("blast_radius.yaml", None),
+            patch("blast_radius.run_git", return_value=str(tmp_path)),
+        ):
+            with pytest.raises(RuntimeError, match="PyYAML"):
+                load_config()
+
+    def test_no_config_no_pyyaml_returns_defaults(self, tmp_path, capsys):
+        """When no config file and no PyYAML, warn to stderr and return defaults."""
+        with (
+            patch("blast_radius.yaml", None),
+            patch("blast_radius.run_git", return_value=str(tmp_path)),
+        ):
+            config = load_config()
+        assert config == DEFAULT_CONFIG
+        captured = capsys.readouterr()
+        assert "PyYAML not installed" in captured.err
+
+    def test_non_dict_yaml_raises(self, tmp_path):
+        """When config contains a YAML list instead of a mapping, raise RuntimeError."""
+        (tmp_path / ".blast-radius.yaml").write_text("- item1\n- item2\n")
+        with patch("blast_radius.run_git", return_value=str(tmp_path)):
+            with pytest.raises(RuntimeError, match="expected a YAML mapping"):
+                load_config()
+
+    def test_invalid_yaml_raises(self, tmp_path):
+        """When config contains unparseable YAML, raise RuntimeError."""
+        (tmp_path / ".blast-radius.yaml").write_text("{{invalid: yaml: [}\n")
+        with patch("blast_radius.run_git", return_value=str(tmp_path)):
+            with pytest.raises(RuntimeError, match="failed to parse"):
+                load_config()
 
 
 AGGLAYER_CONFIG: dict = {
