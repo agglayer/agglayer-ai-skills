@@ -19,6 +19,7 @@ const verbatimFiles = [
   'meta-session-retro/SKILL.md',
   'docs-knowledge-base/SKILL.md',
   'workflow-create-pr/pull_request_template.md',
+  'using-agglayer-skills/SKILL.md',
 ];
 
 const skillFiles = [
@@ -29,6 +30,7 @@ const skillFiles = [
   'style-prose/SKILL.md',
   'meta-session-retro/SKILL.md',
   'docs-knowledge-base/SKILL.md',
+  'using-agglayer-skills/SKILL.md',
 ];
 
 const expectedDigests = {
@@ -39,6 +41,7 @@ const expectedDigests = {
   'meta-session-retro/SKILL.md': '287cc834d4794305e24aee10e47c88b1f4e2af5ce5a7a94afd0e576bd60f88dc',
   'docs-knowledge-base/SKILL.md': '3ac97b891d879d9cf5640f3c6bb90685148553f3dae4e9789af250937d85d1d9',
   'workflow-create-pr/pull_request_template.md': '31cb88864b8645502dbc02fc7910b5da7485cfa638ba81c096abacf1e445c8fe',
+  'using-agglayer-skills/SKILL.md': '0bcaf7843bbb628674e667acc05881d21d2ebb5aa92349940e27753115d65380',
 };
 
 function sha256(content) {
