@@ -6,6 +6,7 @@
   "files": [
     ".claude-plugin/",
     ".opencode/plugins/",
+    "hooks/",
     "skills/",
     "README.md"
   ],
