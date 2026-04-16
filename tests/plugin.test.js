@@ -46,11 +46,14 @@ test('transform injects full bootstrap in standalone mode', async () => {
   await transform({}, output);
 
   const texts = output.messages[0].parts.map((p) => p.text);
-  const injected = texts.find((t) => t.includes('EXTREMELY_IMPORTANT'));
-  assert.ok(injected, 'should inject EXTREMELY_IMPORTANT in standalone mode');
+  const injected = texts.find((t) => t.includes('AGGLAYER_SKILLS_BOOTSTRAP'));
+  assert.ok(injected, 'should inject AGGLAYER_SKILLS_BOOTSTRAP in standalone mode');
   assert.ok(
-    injected.includes('CATALOG_START')
-    || injected.includes('available_skills'),
+    !injected.includes('<EXTREMELY_IMPORTANT'),
+    'standalone mode should NOT use EXTREMELY_IMPORTANT tag (avoids collision with superpowers)',
+  );
+  assert.ok(
+    injected.includes('available_skills'),
     'should include the skill catalog',
   );
   assert.ok(
@@ -76,8 +79,8 @@ test('transform injects catalog only in complement mode', async () => {
   await transform({}, output);
 
   const texts = output.messages[0].parts.map((p) => p.text);
-  const agglayerPart = texts.find((t) => t.includes('AGGLAYER_SKILLS'));
-  assert.ok(agglayerPart, 'should inject AGGLAYER_SKILLS in complement mode');
+  const agglayerPart = texts.find((t) => t.includes('AGGLAYER_SKILLS_BOOTSTRAP'));
+  assert.ok(agglayerPart, 'should inject AGGLAYER_SKILLS_BOOTSTRAP in complement mode');
   assert.ok(
     agglayerPart.includes('available_skills'),
     'should include skill catalog',
@@ -91,7 +94,7 @@ test('transform injects catalog only in complement mode', async () => {
   const superpowersIdx = texts.findIndex((t) =>
     t.includes('EXTREMELY_IMPORTANT'),
   );
-  const agglayerIdx = texts.findIndex((t) => t.includes('AGGLAYER_SKILLS'));
+  const agglayerIdx = texts.findIndex((t) => t.includes('AGGLAYER_SKILLS_BOOTSTRAP'));
   assert.ok(
     agglayerIdx > superpowersIdx,
     'agglayer catalog should appear after superpowers bootstrap',

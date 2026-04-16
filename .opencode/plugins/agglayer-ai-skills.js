@@ -13,7 +13,7 @@ const skillMdPath = path.join(
 const FRONTMATTER_RE = /^---\r?\n[\s\S]+?\r?\n---\r?\n/;
 const CATALOG_DELIMITER = '<!-- CATALOG_START -->';
 const SUPERPOWERS_MARKER = 'EXTREMELY_IMPORTANT';
-const AGGLAYER_MARKER = 'AGGLAYER_SKILLS';
+const AGGLAYER_MARKER = 'AGGLAYER_SKILLS_BOOTSTRAP';
 
 function loadBootstrapSections() {
   let raw;
@@ -74,9 +74,11 @@ export const AgglayerAiSkillsPlugin = async () => ({
         text: block,
       });
     } else {
-      // Standalone mode: inject full bootstrap
+      // Standalone mode: inject full bootstrap with distinct tag
+      // Uses AGGLAYER_SKILLS_BOOTSTRAP (not EXTREMELY_IMPORTANT) so
+      // superpowers can inject independently regardless of load order.
       const block =
-        `<EXTREMELY_IMPORTANT ${AGGLAYER_MARKER}>\n${sections.full}\n</EXTREMELY_IMPORTANT>`;
+        `<${AGGLAYER_MARKER}>\n${sections.full}\n</${AGGLAYER_MARKER}>`;
       firstUser.parts.unshift({ ...ref, type: 'text', text: block });
     }
   },
